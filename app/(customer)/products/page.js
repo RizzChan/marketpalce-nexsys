@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import ProductCard from '@/components/products/ProductCard'
@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/select'
 import { Search, SlidersHorizontal, ShoppingBag } from 'lucide-react'
 
-export default function ProductsPage() {
+function ProductsContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
 
@@ -38,10 +38,8 @@ export default function ProductsPage() {
         ...(search && { search }),
         ...(selectedCategory && { category: selectedCategory }),
       })
-
       const res = await fetch(`/api/products?${params}`)
       const data = await res.json()
-
       if (data.success) {
         setProducts(data.data)
         setPagination(data.pagination)
@@ -71,7 +69,6 @@ export default function ProductsPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
-      {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Semua Produk</h1>
         <p className="text-gray-500">
@@ -79,7 +76,6 @@ export default function ProductsPage() {
         </p>
       </div>
 
-      {/* Filters */}
       <div className="flex flex-col md:flex-row gap-3 mb-8">
         <form onSubmit={handleSearch} className="flex gap-2 flex-1">
           <div className="relative flex-1">
@@ -91,9 +87,7 @@ export default function ProductsPage() {
               className="pl-9"
             />
           </div>
-          <Button type="submit" className="bg-black hover:bg-gray-800">
-            Cari
-          </Button>
+          <Button type="submit" className="bg-black hover:bg-gray-800">Cari</Button>
         </form>
 
         <Select value={sort} onValueChange={(v) => { setSort(v); setPage(1) }}>
@@ -108,15 +102,10 @@ export default function ProductsPage() {
         </Select>
       </div>
 
-      {/* Category Filter */}
       <div className="flex gap-2 flex-wrap mb-8">
         <Badge
           variant={selectedCategory === '' ? 'default' : 'outline'}
-          className={`px-3 py-1 cursor-pointer ${
-            selectedCategory === ''
-              ? 'bg-black text-white'
-              : 'hover:bg-gray-100'
-          }`}
+          className={`px-3 py-1 cursor-pointer ${selectedCategory === '' ? 'bg-black text-white' : 'hover:bg-gray-100'}`}
           onClick={() => { setSelectedCategory(''); setPage(1) }}
         >
           Semua
@@ -125,11 +114,7 @@ export default function ProductsPage() {
           <Badge
             key={cat.id}
             variant={selectedCategory === cat.slug ? 'default' : 'outline'}
-            className={`px-3 py-1 cursor-pointer ${
-              selectedCategory === cat.slug
-                ? 'bg-black text-white'
-                : 'hover:bg-gray-100'
-            }`}
+            className={`px-3 py-1 cursor-pointer ${selectedCategory === cat.slug ? 'bg-black text-white' : 'hover:bg-gray-100'}`}
             onClick={() => { setSelectedCategory(cat.slug); setPage(1) }}
           >
             {cat.name}
@@ -137,7 +122,6 @@ export default function ProductsPage() {
         ))}
       </div>
 
-      {/* Product Grid */}
       {loading ? (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {[...Array(12)].map((_, i) => (
@@ -172,28 +156,27 @@ export default function ProductsPage() {
         </motion.div>
       )}
 
-      {/* Pagination */}
       {pagination.totalPages > 1 && (
         <div className="flex items-center justify-center gap-2 mt-12">
-          <Button
-            variant="outline"
-            onClick={() => setPage(page - 1)}
-            disabled={page === 1}
-          >
+          <Button variant="outline" onClick={() => setPage(page - 1)} disabled={page === 1}>
             Sebelumnya
           </Button>
           <span className="text-sm text-gray-500 px-4">
             Halaman {page} dari {pagination.totalPages}
           </span>
-          <Button
-            variant="outline"
-            onClick={() => setPage(page + 1)}
-            disabled={page === pagination.totalPages}
-          >
+          <Button variant="outline" onClick={() => setPage(page + 1)} disabled={page === pagination.totalPages}>
             Berikutnya
           </Button>
         </div>
       )}
     </div>
+  )
+}
+
+export default function ProductsPage() {
+  return (
+    <Suspense fallback={<div className="max-w-7xl mx-auto px-4 py-8"><div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">{[...Array(12)].map((_, i) => <Skeleton key={i} className="aspect-square w-full rounded-2xl" />)}</div></div>}>
+      <ProductsContent />
+    </Suspense>
   )
 }
