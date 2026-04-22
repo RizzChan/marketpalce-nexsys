@@ -1,0 +1,331 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================
+// ENUM DEFINITIONS
+// ============================================
+
+enum Role {
+  CUSTOMER
+  ADMIN
+}
+
+enum OrderStatus {
+  PAYMENT_PENDING
+  PAID
+  PROCESSING
+  READY_FOR_PICKUP
+  SHIPPED
+  COMPLETED
+  CANCELLED
+}
+
+enum ShippingMethod {
+  PICKUP
+  DELIVERY
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  EXPIRED
+}
+
+// ============================================
+// USER
+// ============================================
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  phone     String?
+  avatar    String?
+  role      Role     @default(CUSTOMER)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  cart      Cart?
+  orders    Order[]
+  wishlist  Wishlist[]
+  reviews   Review[]
+
+  @@index([email])
+  @@map("users")
+}
+
+// ============================================
+// CATEGORY
+// ============================================
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  slug        String    @unique
+  description String?
+  image       String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  products    Product[]
+
+  @@index([slug])
+  @@map("categories")
+}
+
+// ============================================
+// PRODUCT
+// ============================================
+
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  price       Decimal  @db.Decimal(12, 2)
+  stock       Int      @default(0)
+  images      String[] // Array of image URLs
+  weight      Float?   // dalam gram, untuk kalkulasi ongkir
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Foreign Key
+  categoryId  String
+  category    Category @relation(fields: [categoryId], references: [id])
+
+  // Relations
+  cartItems   CartItem[]
+  orderItems  OrderItem[]
+  wishlist    Wishlist[]
+  reviews     Review[]
+
+  @@index([slug])
+  @@index([categoryId])
+  @@index([isActive])
+  @@map("products")
+}
+
+// ============================================
+// CART
+// ============================================
+
+model Cart {
+  id        String     @id @default(cuid())
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  // Foreign Key
+  userId    String     @unique
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Relations
+  items     CartItem[]
+
+  @@map("carts")
+}
+
+model CartItem {
+  id        String   @id @default(cuid())
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign Keys
+  cartId    String
+  cart      Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, productId])
+  @@index([cartId])
+  @@map("cart_items")
+}
+
+// ============================================
+// ORDER
+// ============================================
+
+model Order {
+  id             String         @id @default(cuid())
+  orderNumber    String         @unique // ORD-2026-00001
+  status         OrderStatus    @default(PAYMENT_PENDING)
+  shippingMethod ShippingMethod
+  notes          String?
+  
+  // Harga
+  subtotal       Decimal        @db.Decimal(12, 2)
+  shippingCost   Decimal        @db.Decimal(12, 2) @default(0)
+  total          Decimal        @db.Decimal(12, 2)
+
+  // Pickup
+  pickupCode     String?        @unique // PKP-9F3K2D
+  pickupQrCode   String?        // base64 atau URL QR image
+
+  // Shipping address (jika DELIVERY)
+  shippingName     String?
+  shippingPhone    String?
+  shippingAddress  String?
+  shippingCity     String?
+  shippingProvince String?
+  shippingPostCode String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign Key
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+
+  // Relations
+  items     OrderItem[]
+  payment   Payment?
+  shipping  Shipping?
+  invoice   Invoice?
+
+  @@index([userId])
+  @@index([orderNumber])
+  @@index([status])
+  @@index([pickupCode])
+  @@map("orders")
+}
+
+model OrderItem {
+  id          String  @id @default(cuid())
+  quantity    Int
+  price       Decimal @db.Decimal(12, 2) // Harga saat beli (snapshot)
+  productName String  // Nama produk saat beli (snapshot)
+  productImage String? // Gambar produk saat beli (snapshot)
+
+  // Foreign Keys
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+  @@map("order_items")
+}
+
+// ============================================
+// PAYMENT
+// ============================================
+
+model Payment {
+  id              String        @id @default(cuid())
+  midtransOrderId String        @unique // ID yang dikirim ke Midtrans
+  midtransToken   String?       // Snap token
+  paymentMethod   String?       // gopay, bank_transfer, credit_card, dll
+  status          PaymentStatus @default(PENDING)
+  amount          Decimal       @db.Decimal(12, 2)
+  paidAt          DateTime?
+  expiredAt       DateTime?
+  rawResponse     Json?         // Response mentah dari Midtrans
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Foreign Key
+  orderId String @unique
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([midtransOrderId])
+  @@index([status])
+  @@map("payments")
+}
+
+// ============================================
+// SHIPPING
+// ============================================
+
+model Shipping {
+  id             String    @id @default(cuid())
+  courierName    String?   // JNE, TIKI, SiCepat, dll
+  trackingNumber String?   // Nomor resi
+  shippedAt      DateTime?
+  estimatedArrival DateTime?
+  notes          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Foreign Key
+  orderId String @unique
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("shippings")
+}
+
+// ============================================
+// INVOICE
+// ============================================
+
+model Invoice {
+  id            String   @id @default(cuid())
+  invoiceNumber String   @unique // INV-2026-00021
+  issuedAt      DateTime @default(now())
+  dueAt         DateTime?
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Foreign Key
+  orderId String @unique
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceNumber])
+  @@map("invoices")
+}
+
+// ============================================
+// WISHLIST
+// ============================================
+
+model Wishlist {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  // Foreign Keys
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId]) // Satu user tidak bisa wishlist produk yang sama 2x
+  @@index([userId])
+  @@map("wishlists")
+}
+
+// ============================================
+// REVIEW
+// ============================================
+
+model Review {
+  id        String   @id @default(cuid())
+  rating    Int      // 1 - 5
+  comment   String?
+  isVisible Boolean  @default(true) // Admin bisa sembunyikan review
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign Keys
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId]) // Satu user hanya bisa review 1x per produk
+  @@index([productId])
+  @@index([userId])
+  @@map("reviews")
+}
