@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useSearchParams } from 'next/navigation'
@@ -32,7 +32,8 @@ const ERROR_MESSAGES = {
   server_error: 'Terjadi kesalahan server.',
 }
 
-export default function LoginPage() {
+// ← Komponen terpisah yang pakai useSearchParams
+function LoginContent() {
   const { login } = useAuth()
   const searchParams = useSearchParams()
   const [formData, setFormData] = useState({ email: '', password: '' })
@@ -77,15 +78,8 @@ export default function LoginPage() {
         transition={{ duration: 0.4 }}
         className="w-full max-w-md"
       >
-        {/* Logo */}
         <div className="flex items-center justify-center gap-2 mb-8">
-          <Image
-            src="/logo.png"
-            alt="NEXSYS Logo"
-            width={40}
-            height={40}
-            className="rounded-xl"
-          />
+          <Image src="/logo.png" alt="NEXSYS Logo" width={40} height={40} className="rounded-xl" />
           <span className="text-2xl font-bold text-gray-900">NEXSYS</span>
         </div>
 
@@ -110,7 +104,6 @@ export default function LoginPage() {
                   disabled={isLoading}
                 />
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
                 <div className="relative">
@@ -133,20 +126,13 @@ export default function LoginPage() {
                   </button>
                 </div>
               </div>
-
               <Button type="submit" className="w-full" disabled={isLoading || isGoogleLoading}>
                 {isLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Memproses...
-                  </>
-                ) : (
-                  'Masuk'
-                )}
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Memproses...</>
+                ) : 'Masuk'}
               </Button>
             </form>
 
-            {/* Divider */}
             <div className="relative my-4">
               <div className="absolute inset-0 flex items-center">
                 <span className="w-full border-t border-gray-200" />
@@ -156,7 +142,6 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Tombol Google */}
             <Button
               type="button"
               variant="outline"
@@ -164,15 +149,10 @@ export default function LoginPage() {
               onClick={handleGoogleLogin}
               disabled={isLoading || isGoogleLoading}
             >
-              {isGoogleLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <GoogleIcon />
-              )}
+              {isGoogleLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <GoogleIcon />}
               Lanjutkan dengan Google
             </Button>
 
-            {/* Demo credentials */}
             <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-dashed border-gray-200">
               <p className="text-xs font-medium text-gray-500 mb-2">Demo Akun:</p>
               <p className="text-xs text-gray-600">👤 Admin: admin@marketplace.com / admin123</p>
@@ -189,5 +169,14 @@ export default function LoginPage() {
         </Card>
       </motion.div>
     </div>
+  )
+}
+
+// ← Komponen utama dengan Suspense
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
+      <LoginContent />
+    </Suspense>
   )
 }
