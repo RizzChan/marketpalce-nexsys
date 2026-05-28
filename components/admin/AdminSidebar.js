@@ -19,6 +19,7 @@ const menus = [
   { label: "Produk", href: "/admin/products", icon: Package },
   { label: "Pesanan", href: "/admin/orders", icon: ShoppingBag },
   { label: "Kategori", href: "/admin/categories", icon: Tag },
+  { label: "Report", href: "/admin/reports", icon: BarChart3 },
   { label: "Pengguna", href: "/admin/users", icon: Users },
 ];
 
